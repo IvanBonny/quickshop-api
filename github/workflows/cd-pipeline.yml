@@ -1,0 +1,36 @@
+name: QuickShop CD Pipeline (Blue-Green)
+
+on:
+  workflow_run:
+    workflows: ["QuickShop CI Pipeline"]
+    types:
+      - completed
+
+jobs:
+  deploy-staging-and-swap:
+    runs-on: ubuntu-latest
+    if: ${{ github.event.workflow_run.conclusion == 'success' }}
+
+    steps:
+    - name: Checkout Code
+      uses: actions/checkout@v4
+
+    - name: Azure Login
+      uses: azure/login@v2
+      with:
+        crets: ${{ secrets.AZURE_CREDENTIALS }}
+
+    - name: Deploy to Staging Slot (Green Environment)
+      run: |
+        echo "Deploying build artifact to staging slot..."
+        # az webapp deployment source config-zip ...
+
+    - name: Run Automated Health Checks
+      run: |
+        echo "Validating staging endpoint health..."
+        curl -f https://quickshop-staging-api.azurewebsites.net/health || exit 1
+
+    - name: Perform Blue-Green Slot Swap (Go Live)
+      run: |
+        echo "Swapping staging slot to production..."
+        az webapp deployment slot swap --resource-group rg-quickshop-prod --name quickshop-prod-api --slot staging --target-slot production
